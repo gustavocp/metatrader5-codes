@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                       Sonic2.mq5 |
+//|                                                       Sonic7.mq5 |
 //|                                                    gustrader.com |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
@@ -11,36 +11,43 @@
 //+------------------------------------------------------------------+
 #include <Expert\Expert.mqh>
 //--- available signals
-#include <Expert\Signal\SignalStoch.mqh>
+#include <Expert\Signal\SignalMA.mqh>
 //--- available trailing
-#include <Expert\Trailing\TrailingFixedPips.mqh>
+#include <Expert\Trailing\TrailingMA.mqh>
 //--- available money management
 #include <Expert\Money\MoneyFixedLot.mqh>
 //+------------------------------------------------------------------+
 //| Inputs                                                           |
 //+------------------------------------------------------------------+
 //--- inputs for expert
-input string         Expert_Title                  ="Sonic2";    // Document name
-ulong                Expert_MagicNumber            =24310;       //
-bool                 Expert_EveryTick              =false;       //
+input string             Expert_Title         ="Sonic7";    // Document name
+ulong                    Expert_MagicNumber   =18339;       //
+bool                     Expert_EveryTick     =false;       //
 //--- inputs for main signal
-input int            Signal_ThresholdOpen          =10;          // Signal threshold value to open [0...100]
-input int            Signal_ThresholdClose         =10;          // Signal threshold value to close [0...100]
-input double         Signal_PriceLevel             =0.0;         // Price level to execute a deal
-input double         Signal_StopLevel              =50.0;        // Stop Loss level (in points)
-input double         Signal_TakeLevel              =50.0;        // Take Profit level (in points)
-input int            Signal_Expiration             =4;           // Expiration of pending orders (in bars)
-input int            Signal_Stoch_PeriodK          =8;           // Stochastic(8,3,3,...) K-period
-input int            Signal_Stoch_PeriodD          =3;           // Stochastic(8,3,3,...) D-period
-input int            Signal_Stoch_PeriodSlow       =3;           // Stochastic(8,3,3,...) Period of slowing
-input ENUM_STO_PRICE Signal_Stoch_Applied          =STO_LOWHIGH; // Stochastic(8,3,3,...) Prices to apply to
-input double         Signal_Stoch_Weight           =1.0;         // Stochastic(8,3,3,...) Weight [0...1.0]
+input int                Signal_ThresholdOpen =10;          // Signal threshold value to open [0...100]
+input int                Signal_ThresholdClose=10;          // Signal threshold value to close [0...100]
+input double             Signal_PriceLevel    =0.0;         // Price level to execute a deal
+input double             Signal_StopLevel     =50.0;        // Stop Loss level (in points)
+input double             Signal_TakeLevel     =50.0;        // Take Profit level (in points)
+input int                Signal_Expiration    =4;           // Expiration of pending orders (in bars)
+input int                Signal_0_MA_PeriodMA =9;           // Moving Average(9,0,MODE_SMA,...) Period of averaging
+input int                Signal_0_MA_Shift    =0;           // Moving Average(9,0,MODE_SMA,...) Time shift
+input ENUM_MA_METHOD     Signal_0_MA_Method   =MODE_SMA;    // Moving Average(9,0,MODE_SMA,...) Method of averaging
+input ENUM_APPLIED_PRICE Signal_0_MA_Applied  =PRICE_CLOSE; // Moving Average(9,0,MODE_SMA,...) Prices series
+input double             Signal_0_MA_Weight   =1.0;         // Moving Average(9,0,MODE_SMA,...) Weight [0...1.0]
+input int                Signal_1_MA_PeriodMA =50;          // Moving Average(50,0,...) Period of averaging
+input int                Signal_1_MA_Shift    =0;           // Moving Average(50,0,...) Time shift
+input ENUM_MA_METHOD     Signal_1_MA_Method   =MODE_SMA;    // Moving Average(50,0,...) Method of averaging
+input ENUM_APPLIED_PRICE Signal_1_MA_Applied  =PRICE_CLOSE; // Moving Average(50,0,...) Prices series
+input double             Signal_1_MA_Weight   =1.0;         // Moving Average(50,0,...) Weight [0...1.0]
 //--- inputs for trailing
-input int            Trailing_FixedPips_StopLevel  =100;         // Stop Loss trailing level (in points)
-input int            Trailing_FixedPips_ProfitLevel=100;         // Take Profit trailing level (in points)
+input int                Trailing_MA_Period   =20;          // Period of MA
+input int                Trailing_MA_Shift    =0;           // Shift of MA
+input ENUM_MA_METHOD     Trailing_MA_Method   =MODE_SMA;    // Method of averaging
+input ENUM_APPLIED_PRICE Trailing_MA_Applied  =PRICE_CLOSE; // Prices series
 //--- inputs for money
-input double         Money_FixLot_Percent          =1.0;         // Percent
-input double         Money_FixLot_Lots             =1.0;         // Fixed volume
+input double             Money_FixLot_Percent =10.0;        // Percent
+input double             Money_FixLot_Lots    =0.1;         // Fixed volume
 //+------------------------------------------------------------------+
 //| Global expert object                                             |
 //+------------------------------------------------------------------+
@@ -75,8 +82,8 @@ int OnInit()
    signal.StopLevel(Signal_StopLevel);
    signal.TakeLevel(Signal_TakeLevel);
    signal.Expiration(Signal_Expiration);
-//--- Creating filter CSignalStoch
-   CSignalStoch *filter0=new CSignalStoch;
+//--- Creating filter CSignalMA
+   CSignalMA *filter0=new CSignalMA;
    if(filter0==NULL)
      {
       //--- failed
@@ -86,13 +93,29 @@ int OnInit()
      }
    signal.AddFilter(filter0);
 //--- Set filter parameters
-   filter0.PeriodK(Signal_Stoch_PeriodK);
-   filter0.PeriodD(Signal_Stoch_PeriodD);
-   filter0.PeriodSlow(Signal_Stoch_PeriodSlow);
-   filter0.Applied(Signal_Stoch_Applied);
-   filter0.Weight(Signal_Stoch_Weight);
+   filter0.PeriodMA(Signal_0_MA_PeriodMA);
+   filter0.Shift(Signal_0_MA_Shift);
+   filter0.Method(Signal_0_MA_Method);
+   filter0.Applied(Signal_0_MA_Applied);
+   filter0.Weight(Signal_0_MA_Weight);
+//--- Creating filter CSignalMA
+   CSignalMA *filter1=new CSignalMA;
+   if(filter1==NULL)
+     {
+      //--- failed
+      printf(__FUNCTION__+": error creating filter1");
+      ExtExpert.Deinit();
+      return(INIT_FAILED);
+     }
+   signal.AddFilter(filter1);
+//--- Set filter parameters
+   filter1.PeriodMA(Signal_1_MA_PeriodMA);
+   filter1.Shift(Signal_1_MA_Shift);
+   filter1.Method(Signal_1_MA_Method);
+   filter1.Applied(Signal_1_MA_Applied);
+   filter1.Weight(Signal_1_MA_Weight);
 //--- Creation of trailing object
-   CTrailingFixedPips *trailing=new CTrailingFixedPips;
+   CTrailingMA *trailing=new CTrailingMA;
    if(trailing==NULL)
      {
       //--- failed
@@ -109,8 +132,10 @@ int OnInit()
       return(INIT_FAILED);
      }
 //--- Set trailing parameters
-   trailing.StopLevel(Trailing_FixedPips_StopLevel);
-   trailing.ProfitLevel(Trailing_FixedPips_ProfitLevel);
+   trailing.Period(Trailing_MA_Period);
+   trailing.Shift(Trailing_MA_Shift);
+   trailing.Method(Trailing_MA_Method);
+   trailing.Applied(Trailing_MA_Applied);
 //--- Creation of money object
    CMoneyFixedLot *money=new CMoneyFixedLot;
    if(money==NULL)
